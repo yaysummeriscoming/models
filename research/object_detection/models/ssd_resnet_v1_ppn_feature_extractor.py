@@ -14,7 +14,7 @@
 # ==============================================================================
 """SSD feature extractors based on Resnet v1 and PPN architectures."""
 
-import tensorflow as tf
+import tensorflow.compat.v1 as tf
 from tensorflow.contrib import slim as contrib_slim
 
 from object_detection.meta_architectures import ssd_meta_arch

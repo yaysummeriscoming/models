@@ -22,7 +22,7 @@ as well as
 Huang et al. (https://arxiv.org/abs/1611.10012)
 """
 
-import tensorflow as tf
+import tensorflow.compat.v1 as tf
 from tensorflow.contrib import slim as contrib_slim
 
 from object_detection.meta_architectures import faster_rcnn_meta_arch

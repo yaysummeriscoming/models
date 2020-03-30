@@ -94,7 +94,7 @@ python object_detection/export_tflite_ssd_graph \
 import os
 os.environ['PYTHONPATH'] += ':/content/models/research/:/content/models/research/slim/'
 
-import tensorflow as tf
+import tensorflow.compat.v1 as tf
 from google.protobuf import text_format
 from object_detection import export_tflite_ssd_graph_lib
 from object_detection.protos import pipeline_pb2

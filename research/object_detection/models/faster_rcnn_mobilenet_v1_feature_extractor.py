@@ -16,7 +16,7 @@
 """Mobilenet v1 Faster R-CNN implementation."""
 import numpy as np
 
-import tensorflow as tf
+import tensorflow.compat.v1 as tf
 from tensorflow.contrib import slim as contrib_slim
 
 from object_detection.meta_architectures import faster_rcnn_meta_arch

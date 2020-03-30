@@ -16,7 +16,7 @@
 """Convolutional Box Predictors with and without weight sharing."""
 import collections
 
-import tensorflow as tf
+import tensorflow.compat.v1 as tf
 
 from object_detection.core import box_predictor
 from object_detection.utils import shape_utils

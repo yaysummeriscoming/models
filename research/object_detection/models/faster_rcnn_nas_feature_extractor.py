@@ -20,7 +20,7 @@ Barret Zoph, Vijay Vasudevan, Jonathon Shlens, Quoc V. Le
 https://arxiv.org/abs/1707.07012
 """
 
-import tensorflow as tf
+import tensorflow.compat.v1 as tf
 from tensorflow.contrib import framework as contrib_framework
 from tensorflow.contrib import slim as contrib_slim
 

@@ -94,7 +94,7 @@ configured in the meta architecture:
 """
 import abc
 import functools
-import tensorflow as tf
+import tensorflow.compat.v1 as tf
 from tensorflow.contrib import framework as contrib_framework
 from tensorflow.contrib import slim as contrib_slim
 

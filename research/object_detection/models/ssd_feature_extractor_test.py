@@ -19,7 +19,7 @@ from abc import abstractmethod
 
 import numpy as np
 from six.moves import zip
-import tensorflow as tf
+import tensorflow.compat.v1 as tf
 
 from google.protobuf import text_format
 from tensorflow.contrib import slim as contrib_slim

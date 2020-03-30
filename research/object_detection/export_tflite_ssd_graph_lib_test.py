@@ -19,7 +19,7 @@ from __future__ import print_function
 import os
 import numpy as np
 import six
-import tensorflow as tf
+import tensorflow.compat.v1 as tf
 from tensorflow.core.framework import types_pb2
 from object_detection import export_tflite_ssd_graph_lib
 from object_detection import exporter

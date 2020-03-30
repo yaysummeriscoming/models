@@ -21,7 +21,7 @@ from __future__ import print_function
 import copy
 import time
 
-import tensorflow as tf
+import tensorflow.compat.v1 as tf
 
 from object_detection import eval_util
 from object_detection import inputs

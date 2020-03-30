@@ -22,7 +22,7 @@ Keypoints could be used to represent the human body joint locations as in
 Mask RCNN paper. Or they could be used to represent different part locations of
 objects.
 """
-import tensorflow as tf
+import tensorflow.compat.v1 as tf
 from tensorflow.contrib import slim as contrib_slim
 
 from object_detection.predictors.heads import head

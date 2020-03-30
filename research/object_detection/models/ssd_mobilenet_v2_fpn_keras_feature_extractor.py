@@ -15,7 +15,7 @@
 
 """SSD Keras-based MobilenetV2 FPN Feature Extractor."""
 
-import tensorflow as tf
+import tensorflow.compat.v1 as tf
 
 from object_detection.meta_architectures import ssd_meta_arch
 from object_detection.models import feature_map_generators

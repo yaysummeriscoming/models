@@ -23,7 +23,7 @@ from __future__ import print_function
 import logging
 import re
 
-import tensorflow as tf
+import tensorflow.compat.v1 as tf
 
 from tensorflow.python.ops import variables as tf_variables
 

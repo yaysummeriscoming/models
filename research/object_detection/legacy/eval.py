@@ -48,7 +48,7 @@ sys.path.insert(0, '/users/pieterluitjens/object_detection/models/research/slim/
 
 import functools
 import os
-import tensorflow as tf
+import tensorflow.compat.v1 as tf
 from tensorflow.contrib import framework as contrib_framework
 
 from object_detection.builders import dataset_builder

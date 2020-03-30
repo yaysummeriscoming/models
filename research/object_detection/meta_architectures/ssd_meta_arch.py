@@ -18,7 +18,7 @@ General tensorflow implementation of convolutional Multibox/SSD detection
 models.
 """
 import abc
-import tensorflow as tf
+import tensorflow.compat.v1 as tf
 from tensorflow.contrib import slim as contrib_slim
 from tensorflow.contrib import tpu as contrib_tpu
 

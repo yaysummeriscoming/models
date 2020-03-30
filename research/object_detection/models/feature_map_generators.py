@@ -25,7 +25,7 @@ of final feature maps.
 """
 import collections
 import functools
-import tensorflow as tf
+import tensorflow.compat.v1 as tf
 from tensorflow.contrib import slim as contrib_slim
 from object_detection.utils import ops
 from object_detection.utils import shape_utils

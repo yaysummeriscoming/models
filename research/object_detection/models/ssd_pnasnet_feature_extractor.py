@@ -18,7 +18,7 @@
 Based on PNASNet ImageNet model: https://arxiv.org/abs/1712.00559
 """
 
-import tensorflow as tf
+import tensorflow.compat.v1 as tf
 from tensorflow.contrib import slim as contrib_slim
 
 from object_detection.meta_architectures import ssd_meta_arch
