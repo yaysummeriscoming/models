@@ -18,13 +18,9 @@ from __future__ import absolute_import
 from __future__ import division
 from __future__ import print_function
 
-
 import abc
 import functools
 import re
-import six
-from absl import logging
-
 import tensorflow.compat.v2 as tf
 from official.vision.detection.modeling import checkpoint_utils
 from official.vision.detection.modeling import learning_rates
@@ -36,8 +32,15 @@ class OptimizerFactory(object):
   def __init__(self, params):
     """Creates optimized based on the specified flags."""
     if params.type == 'momentum':
+      nesterov = False
+      try:
+        nesterov = params.nesterov
+      except AttributeError:
+        pass
       self._optimizer = functools.partial(
-          tf.keras.optimizers.SGD, momentum=0.9, nesterov=True)
+          tf.keras.optimizers.SGD,
+          momentum=params.momentum,
+          nesterov=nesterov)
     elif params.type == 'adam':
       self._optimizer = tf.keras.optimizers.Adam
     elif params.type == 'adadelta':
@@ -46,7 +49,7 @@ class OptimizerFactory(object):
       self._optimizer = tf.keras.optimizers.Adagrad
     elif params.type == 'rmsprop':
       self._optimizer = functools.partial(
-          tf.keras.optimizers.RMSProp, momentum=params.momentum)
+          tf.keras.optimizers.RMSprop, momentum=params.momentum)
     else:
       raise ValueError('Unsupported optimizer type %s.' % self._optimizer)
 
@@ -55,11 +58,10 @@ class OptimizerFactory(object):
 
 
 def _make_filter_trainable_variables_fn(frozen_variable_prefix):
-  """Creates a function for filtering trainable varialbes.
-  """
+  """Creates a function for filtering trainable varialbes."""
 
   def _filter_trainable_variables(variables):
-    """Filters trainable varialbes
+    """Filters trainable varialbes.
 
     Args:
       variables: a list of tf.Variable to be filtered.
@@ -86,12 +88,19 @@ class Model(object):
   def __init__(self, params):
     self._use_bfloat16 = params.architecture.use_bfloat16
 
+    if params.architecture.use_bfloat16:
+      policy = tf.compat.v2.keras.mixed_precision.experimental.Policy(
+          'mixed_bfloat16')
+      tf.compat.v2.keras.mixed_precision.experimental.set_policy(policy)
+
     # Optimization.
     self._optimizer_fn = OptimizerFactory(params.train.optimizer)
     self._learning_rate = learning_rates.learning_rate_generator(
         params.train.learning_rate)
 
     self._frozen_variable_prefix = params.train.frozen_variable_prefix
+    self._regularization_var_regex = params.train.regularization_variable_regex
+    self._l2_weight_decay = params.train.l2_weight_decay
 
     # Checkpoint restoration.
     self._checkpoint = params.train.checkpoint.as_dict()
@@ -129,17 +138,18 @@ class Model(object):
     return self._optimizer_fn(self._learning_rate)
 
   def make_filter_trainable_variables_fn(self):
-    """Creates a function for filtering trainable varialbes.
-    """
+    """Creates a function for filtering trainable varialbes."""
     return _make_filter_trainable_variables_fn(self._frozen_variable_prefix)
 
-  def weight_decay_loss(self, l2_weight_decay, keras_model):
-    # TODO(yeqing): Correct the filter according to  cr/269707763.
-    return l2_weight_decay * tf.add_n([
-        tf.nn.l2_loss(v)
-        for v in self._keras_model.trainable_variables
-        if 'batch_normalization' not in v.name and 'bias' not in v.name
-    ])
+  def weight_decay_loss(self, trainable_variables):
+    reg_variables = [
+        v for v in trainable_variables
+        if self._regularization_var_regex is None
+        or re.match(self._regularization_var_regex, v.name)
+    ]
+
+    return self._l2_weight_decay * tf.add_n(
+        [tf.nn.l2_loss(v) for v in reg_variables])
 
   def make_restore_checkpoint_fn(self):
     """Returns scaffold function to restore parameters from v1 checkpoint."""

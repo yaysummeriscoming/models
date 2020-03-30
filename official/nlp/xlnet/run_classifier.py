@@ -27,12 +27,12 @@ from absl import logging
 import numpy as np
 import tensorflow as tf
 # pylint: disable=unused-import
-from official.nlp import xlnet_config
-from official.nlp import xlnet_modeling as modeling
 from official.nlp.xlnet import common_flags
 from official.nlp.xlnet import data_utils
 from official.nlp.xlnet import optimization
 from official.nlp.xlnet import training_utils
+from official.nlp.xlnet import xlnet_config
+from official.nlp.xlnet import xlnet_modeling as modeling
 from official.utils.misc import tpu_lib
 
 flags.DEFINE_integer("n_class", default=2, help="Number of classes.")
@@ -87,7 +87,7 @@ def run_evaluation(strategy,
   @tf.function
   def _run_evaluation(test_iterator):
     """Runs validation steps."""
-    logits, labels, masks = strategy.experimental_run_v2(
+    logits, labels, masks = strategy.run(
         _test_step_fn, args=(next(test_iterator),))
     return logits, labels, masks
 
@@ -193,5 +193,4 @@ def main(unused_argv):
 
 
 if __name__ == "__main__":
-  assert tf.version.VERSION.startswith('2.')
   app.run(main)

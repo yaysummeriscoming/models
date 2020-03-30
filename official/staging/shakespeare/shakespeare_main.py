@@ -59,8 +59,7 @@ def define_flags():
                                 max_train_steps=False,
                                 dtype=True,
                                 loss_scale=True,
-                                enable_xla=True,
-                                force_v2_in_keras_compile=True)
+                                enable_xla=True)
 
   flags_core.set_defaults(train_epochs=43,
                           batch_size=64)
@@ -75,6 +74,8 @@ def define_flags():
   flags.DEFINE_integer(
       name='predict_length', default=1000,
       help='Length of the predicted text including the context.')
+  flags.DEFINE_integer(name='train_steps', default=None,
+                       help='Overrides train_steps per epoch if not None.')
   flags.DEFINE_integer(
       name='log_steps', default=100,
       help='For every log_steps, we log the timing information such as '
@@ -174,7 +175,10 @@ def train_model(flags_obj, dataset, vocab_size, strategy, checkpoint_dir=None):
   Returns:
     The training history and callbacks.
   """
-  train_steps = BATCHES_PER_EPOCH // flags_obj.batch_size
+  if flags_obj.train_steps:
+    train_steps = flags_obj.train_steps
+  else:
+    train_steps = BATCHES_PER_EPOCH // flags_obj.batch_size
   strategy_scope = distribution_utils.get_strategy_scope(strategy)
 
   with strategy_scope:
@@ -188,8 +192,7 @@ def train_model(flags_obj, dataset, vocab_size, strategy, checkpoint_dir=None):
         loss=tf.keras.losses.CategoricalCrossentropy(),
         metrics=[tf.keras.metrics.Recall(top_k=1, name='RecallAt1'),
                  tf.keras.metrics.Recall(top_k=5, name='RecallAt5')],
-        run_eagerly=flags_obj.run_eagerly,
-        experimental_run_tf_function=flags_obj.force_v2_in_keras_compile)
+        run_eagerly=flags_obj.run_eagerly)
 
   callbacks = []
   if checkpoint_dir:

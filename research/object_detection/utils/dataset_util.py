@@ -35,7 +35,12 @@ def bytes_feature(value):
 
 
 def bytes_list_feature(value):
-  return tf.train.Feature(bytes_list=tf.train.BytesList(value=value))
+  # tf.train.BytesList should accept a string arguement, but it doesn't in python 3..  Have to manually encode
+  value_parsed = []
+  for entry in value:
+    value_parsed.append(entry.encode('utf-8'))
+  bytes = tf.train.BytesList(value=value_parsed)
+  return tf.train.Feature(bytes_list=bytes)
 
 
 def float_list_feature(value):

@@ -23,14 +23,15 @@
 # need to be fine-tuned for the detection task.
 # Note that we need to trailing `/` to avoid the incorrect match.
 # [1]: https://github.com/facebookresearch/Detectron/blob/master/detectron/core/config.py#L198
-RESNET50_FROZEN_VAR_PREFIX = r'(resnet\d+/)conv2d(|_([1-9]|10))\/'
-
+RESNET_FROZEN_VAR_PREFIX = r'(resnet\d+)\/(conv2d(|_([1-9]|10))|batch_normalization(|_([1-9]|10)))\/'
+REGULARIZATION_VAR_REGEX = r'.*(kernel|weight):0$'
 
 # pylint: disable=line-too-long
 RETINANET_CFG = {
     'type': 'retinanet',
     'model_dir': '',
     'use_tpu': True,
+    'strategy_type': 'tpu',
     'train': {
         'batch_size': 64,
         'iterations_per_loop': 500,
@@ -38,6 +39,7 @@ RETINANET_CFG = {
         'optimizer': {
             'type': 'momentum',
             'momentum': 0.9,
+            'nesterov': True,  # `False` is better for TPU v3-128.
         },
         'learning_rate': {
             'type': 'step',
@@ -51,11 +53,13 @@ RETINANET_CFG = {
             'path': '',
             'prefix': '',
         },
-        'frozen_variable_prefix': RESNET50_FROZEN_VAR_PREFIX,
+        'frozen_variable_prefix': RESNET_FROZEN_VAR_PREFIX,
         'train_file_pattern': '',
         # TODO(b/142174042): Support transpose_input option.
         'transpose_input': False,
+        'regularization_variable_regex': REGULARIZATION_VAR_REGEX,
         'l2_weight_decay': 0.0001,
+        'input_sharding': False,
     },
     'eval': {
         'batch_size': 8,
@@ -65,6 +69,10 @@ RETINANET_CFG = {
         'type': 'box',
         'val_json_file': '',
         'eval_file_pattern': '',
+        'input_sharding': True,
+        # When visualizing images, set evaluation batch size to 40 to avoid
+        # potential OOM.
+        'num_images_to_visualize': 0,
     },
     'predict': {
         'predict_batch_size': 8,
@@ -98,10 +106,6 @@ RETINANET_CFG = {
     },
     'resnet': {
         'resnet_depth': 50,
-        'dropblock': {
-            'dropblock_keep_prob': None,
-            'dropblock_size': None,
-        },
         'batch_norm': {
             'batch_norm_momentum': 0.997,
             'batch_norm_epsilon': 1e-4,
@@ -113,22 +117,7 @@ RETINANET_CFG = {
         'max_level': 7,
         'fpn_feat_dims': 256,
         'use_separable_conv': False,
-        'batch_norm': {
-            'batch_norm_momentum': 0.997,
-            'batch_norm_epsilon': 1e-4,
-            'batch_norm_trainable': True,
-        },
-    },
-    'nasfpn': {
-        'min_level': 3,
-        'max_level': 7,
-        'fpn_feat_dims': 256,
-        'num_repeats': 5,
-        'use_separable_conv': False,
-        'dropblock': {
-            'dropblock_keep_prob': None,
-            'dropblock_size': None,
-        },
+        'use_batch_norm': True,
         'batch_norm': {
             'batch_norm_momentum': 0.997,
             'batch_norm_epsilon': 1e-4,
@@ -162,26 +151,21 @@ RETINANET_CFG = {
         'use_batched_nms': False,
         'min_level': 3,
         'max_level': 7,
-        'num_classes': 91,
         'max_total_size': 100,
         'nms_iou_threshold': 0.5,
-        'score_threshold': 0.05
+        'score_threshold': 0.05,
+        'pre_nms_num_boxes': 5000,
     },
     'enable_summary': False,
 }
 
 RETINANET_RESTRICTIONS = [
     'architecture.use_bfloat16 == retinanet_parser.use_bfloat16',
-    'anchor.min_level == fpn.min_level',
-    'anchor.max_level == fpn.max_level',
-    'anchor.min_level == nasfpn.min_level',
-    'anchor.max_level == nasfpn.max_level',
     'anchor.min_level == retinanet_head.min_level',
     'anchor.max_level == retinanet_head.max_level',
     'anchor.min_level == postprocess.min_level',
     'anchor.max_level == postprocess.max_level',
     'retinanet_head.num_classes == retinanet_loss.num_classes',
-    'retinanet_head.num_classes == postprocess.num_classes',
 ]
 
 # pylint: enable=line-too-long

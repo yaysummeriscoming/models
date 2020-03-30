@@ -22,9 +22,10 @@ import time
 from absl import flags
 import tensorflow as tf
 
-from official.vision.image_classification import common
-from official.vision.image_classification import resnet_ctl_imagenet_main
+from official.vision.image_classification.resnet import common
+from official.vision.image_classification.resnet import resnet_ctl_imagenet_main
 from official.utils.testing.perfzero_benchmark import PerfZeroBenchmark
+from official.utils.testing import benchmark_wrappers
 from official.utils.flags import core as flags_core
 
 MIN_TOP_1_ACCURACY = 0.76
@@ -82,14 +83,13 @@ class CtlBenchmark(PerfZeroBenchmark):
       metrics.append({'name': 'train_loss', 'value': stats['train_loss']})
 
     if (warmup and 'step_timestamp_log' in stats and
-        len(stats['step_timestamp_log']) > warmup):
-      # first entry in the time_log is start of step 1. The rest of the
+        len(stats['step_timestamp_log']) > warmup + 1):
+      # first entry in the time_log is start of step 0. The rest of the
       # entries are the end of each step recorded
       time_log = stats['step_timestamp_log']
-      elapsed = time_log[-1].timestamp - time_log[warmup].timestamp
-      num_examples = (
-          total_batch_size * log_steps * (len(time_log) - warmup - 1))
-      examples_per_sec = num_examples / elapsed
+      steps_elapsed = time_log[-1].batch_index - time_log[warmup].batch_index
+      time_elapsed = time_log[-1].timestamp - time_log[warmup].timestamp
+      examples_per_sec = total_batch_size * (steps_elapsed / time_elapsed)
       metrics.append({'name': 'exp_per_second', 'value': examples_per_sec})
 
     if 'avg_exp_per_second' in stats:
@@ -169,6 +169,7 @@ class Resnet50CtlAccuracy(CtlBenchmark):
     FLAGS.datasets_num_private_threads = 14
     self._run_and_report_benchmark()
 
+  @benchmark_wrappers.enable_runtime_flags
   def _run_and_report_benchmark(self):
     start_time_sec = time.time()
     stats = resnet_ctl_imagenet_main.run(flags.FLAGS)
@@ -197,6 +198,7 @@ class Resnet50CtlBenchmarkBase(CtlBenchmark):
         flag_methods=flag_methods,
         default_flags=default_flags)
 
+  @benchmark_wrappers.enable_runtime_flags
   def _run_and_report_benchmark(self):
     start_time_sec = time.time()
     stats = resnet_ctl_imagenet_main.run(FLAGS)
@@ -228,9 +230,20 @@ class Resnet50CtlBenchmarkBase(CtlBenchmark):
     self._setup()
 
     FLAGS.num_gpus = 1
-    FLAGS.distribution_strategy = 'default'
+    FLAGS.distribution_strategy = 'one_device'
     FLAGS.model_dir = self._get_model_dir('benchmark_1_gpu')
     FLAGS.batch_size = 128
+    self._run_and_report_benchmark()
+
+  def benchmark_1_gpu_fp16(self):
+    """Test Keras model with 1 GPU with tf.keras mixed precision."""
+    self._setup()
+
+    FLAGS.num_gpus = 1
+    FLAGS.distribution_strategy = 'one_device'
+    FLAGS.model_dir = self._get_model_dir('benchmark_1_gpu_fp16')
+    FLAGS.batch_size = 256
+    FLAGS.dtype = 'fp16'
     self._run_and_report_benchmark()
 
   def benchmark_1_gpu_amp(self):
@@ -238,7 +251,7 @@ class Resnet50CtlBenchmarkBase(CtlBenchmark):
     self._setup()
 
     FLAGS.num_gpus = 1
-    FLAGS.distribution_strategy = 'default'
+    FLAGS.distribution_strategy = 'one_device'
     FLAGS.model_dir = self._get_model_dir('benchmark_1_gpu_amp')
     FLAGS.batch_size = 256
     FLAGS.dtype = 'fp16'
@@ -250,7 +263,7 @@ class Resnet50CtlBenchmarkBase(CtlBenchmark):
     self._setup()
 
     FLAGS.num_gpus = 1
-    FLAGS.distribution_strategy = 'default'
+    FLAGS.distribution_strategy = 'one_device'
     FLAGS.model_dir = self._get_model_dir('benchmark_xla_1_gpu_amp')
     FLAGS.batch_size = 256
     FLAGS.dtype = 'fp16'
@@ -263,10 +276,25 @@ class Resnet50CtlBenchmarkBase(CtlBenchmark):
     self._setup()
 
     FLAGS.num_gpus = 1
-    FLAGS.distribution_strategy = 'default'
+    FLAGS.distribution_strategy = 'one_device'
     FLAGS.model_dir = self._get_model_dir('benchmark_1_gpu_eager')
-    FLAGS.batch_size = 64
+    FLAGS.batch_size = 128
     FLAGS.use_tf_function = False
+    FLAGS.use_tf_while_loop = False
+    FLAGS.single_l2_loss_op = True
+    self._run_and_report_benchmark()
+
+  def benchmark_1_gpu_fp16_eager(self):
+    """Test Keras model with 1 GPU with fp16 and pure eager mode."""
+    self._setup()
+
+    FLAGS.num_gpus = 1
+    FLAGS.distribution_strategy = 'one_device'
+    FLAGS.model_dir = self._get_model_dir('benchmark_1_gpu_fp16_eager')
+    FLAGS.batch_size = 250
+    FLAGS.dtype = 'fp16'
+    FLAGS.use_tf_function = False
+    FLAGS.use_tf_while_loop = False
     FLAGS.single_l2_loss_op = True
     self._run_and_report_benchmark()
 
@@ -275,9 +303,45 @@ class Resnet50CtlBenchmarkBase(CtlBenchmark):
     self._setup()
 
     FLAGS.num_gpus = 8
-    FLAGS.distribution_strategy = 'default'
+    FLAGS.distribution_strategy = 'mirrored'
     FLAGS.model_dir = self._get_model_dir('benchmark_8_gpu')
     FLAGS.batch_size = 128 * 8  # 8 GPUs
+    self._run_and_report_benchmark()
+
+  def benchmark_8_gpu_fp16(self):
+    """Test Keras model with 8 GPUs with tf.keras mixed precision."""
+    self._setup()
+
+    FLAGS.num_gpus = 8
+    FLAGS.distribution_strategy = 'mirrored'
+    FLAGS.model_dir = self._get_model_dir('benchmark_8_gpu_fp16')
+    FLAGS.batch_size = 256 * 8  # 8 GPUs
+    FLAGS.dtype = 'fp16'
+    self._run_and_report_benchmark()
+
+  def benchmark_8_gpu_eager(self):
+    """Test Keras model with 8 GPUs, eager, fp32."""
+    self._setup()
+
+    FLAGS.num_gpus = 8
+    FLAGS.use_tf_function = False
+    FLAGS.use_tf_while_loop = False
+    FLAGS.distribution_strategy = 'mirrored'
+    FLAGS.model_dir = self._get_model_dir('benchmark_8_gpu_eager')
+    FLAGS.batch_size = 128
+    self._run_and_report_benchmark()
+
+  def benchmark_8_gpu_eager_fp16(self):
+    """Test Keras model with 8 GPUs, eager, fp16."""
+    self._setup()
+
+    FLAGS.num_gpus = 8
+    FLAGS.dtype = 'fp16'
+    FLAGS.use_tf_function = False
+    FLAGS.use_tf_while_loop = False
+    FLAGS.distribution_strategy = 'mirrored'
+    FLAGS.model_dir = self._get_model_dir('benchmark_8_gpu_eager_fp16')
+    FLAGS.batch_size = 128
     self._run_and_report_benchmark()
 
   def benchmark_8_gpu_amp(self):
@@ -285,7 +349,7 @@ class Resnet50CtlBenchmarkBase(CtlBenchmark):
     self._setup()
 
     FLAGS.num_gpus = 8
-    FLAGS.distribution_strategy = 'default'
+    FLAGS.distribution_strategy = 'mirrored'
     FLAGS.model_dir = self._get_model_dir('benchmark_8_gpu_amp')
     FLAGS.batch_size = 256 * 8  # 8 GPUs
     FLAGS.dtype = 'fp16'
@@ -297,7 +361,7 @@ class Resnet50CtlBenchmarkBase(CtlBenchmark):
     self._setup()
 
     FLAGS.num_gpus = 8
-    FLAGS.distribution_strategy = 'default'
+    FLAGS.distribution_strategy = 'mirrored'
     FLAGS.model_dir = self._get_model_dir('benchmark_xla_8_gpu_amp')
     FLAGS.batch_size = 256 * 8  # 8 GPUs
     FLAGS.dtype = 'fp16'
@@ -318,6 +382,7 @@ class Resnet50CtlBenchmarkSynth(Resnet50CtlBenchmarkBase):
     def_flags['skip_eval'] = True
     def_flags['use_synthetic_data'] = True
     def_flags['train_steps'] = 110
+    def_flags['steps_per_loop'] = 20
     def_flags['log_steps'] = 10
 
     super(Resnet50CtlBenchmarkSynth, self).__init__(
@@ -332,6 +397,7 @@ class Resnet50CtlBenchmarkReal(Resnet50CtlBenchmarkBase):
     def_flags['skip_eval'] = True
     def_flags['data_dir'] = os.path.join(root_data_dir, 'imagenet')
     def_flags['train_steps'] = 110
+    def_flags['steps_per_loop'] = 20
     def_flags['log_steps'] = 10
 
     super(Resnet50CtlBenchmarkReal, self).__init__(

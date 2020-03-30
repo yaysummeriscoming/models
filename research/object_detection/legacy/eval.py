@@ -42,6 +42,10 @@ Example usage:
         --model_config_path=model_config.pbtxt \
         --input_config_path=eval_input_config.pbtxt
 """
+import sys
+sys.path.insert(0, '/users/pieterluitjens/object_detection/models/research/object_detection/')
+sys.path.insert(0, '/users/pieterluitjens/object_detection/models/research/slim/')
+
 import functools
 import os
 import tensorflow as tf

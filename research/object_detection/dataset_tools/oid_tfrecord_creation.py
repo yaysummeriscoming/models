@@ -18,7 +18,8 @@ from __future__ import absolute_import
 from __future__ import division
 from __future__ import print_function
 
-import tensorflow as tf
+import tensorflow.compat.v1 as tf
+import numpy as np
 
 from object_detection.core import standard_fields
 from object_detection.utils import dataset_util
@@ -47,30 +48,63 @@ def tf_example_from_annotations_data_frame(annotations_data_frame, label_map,
       filtered_data_frame.YMin.isnull()]
   image_id = annotations_data_frame.ImageID.iloc[0]
 
+  # print('Length is:')
+  # print(len(filtered_data_frame_boxes.LabelName))
+
+  # print('Val is: ')
+  # print(filtered_data_frame_boxes.LabelName.tolist())
+
   feature_map = {
+      # standard_fields.TfExampleFields.object_bbox_ymin:
+      #     dataset_util.float_list_feature(
+      #         filtered_data_frame_boxes.YMin.as_matrix()),
+      # standard_fields.TfExampleFields.object_bbox_xmin:
+      #     dataset_util.float_list_feature(
+      #         filtered_data_frame_boxes.XMin.as_matrix()),
+      # standard_fields.TfExampleFields.object_bbox_ymax:
+      #     dataset_util.float_list_feature(
+      #         filtered_data_frame_boxes.YMax.as_matrix()),
+      # standard_fields.TfExampleFields.object_bbox_xmax:
+      #     dataset_util.float_list_feature(
+      #         filtered_data_frame_boxes.XMax.as_matrix()),
+      # standard_fields.TfExampleFields.object_class_text:
+      #     dataset_util.bytes_list_feature(
+      #         filtered_data_frame_boxes.LabelName.as_matrix()),
+
+
+
       standard_fields.TfExampleFields.object_bbox_ymin:
           dataset_util.float_list_feature(
-              filtered_data_frame_boxes.YMin.as_matrix()),
+              filtered_data_frame_boxes.YMin),
       standard_fields.TfExampleFields.object_bbox_xmin:
           dataset_util.float_list_feature(
-              filtered_data_frame_boxes.XMin.as_matrix()),
+              filtered_data_frame_boxes.XMin),
       standard_fields.TfExampleFields.object_bbox_ymax:
           dataset_util.float_list_feature(
-              filtered_data_frame_boxes.YMax.as_matrix()),
+              filtered_data_frame_boxes.YMax),
       standard_fields.TfExampleFields.object_bbox_xmax:
           dataset_util.float_list_feature(
-              filtered_data_frame_boxes.XMax.as_matrix()),
+              filtered_data_frame_boxes.XMax),
       standard_fields.TfExampleFields.object_class_text:
           dataset_util.bytes_list_feature(
-              filtered_data_frame_boxes.LabelName.as_matrix()),
+              # filtered_data_frame_boxes.LabelName.as_matrix()),
+              # filtered_data_frame_boxes.LabelName),
+              # [filtered_data_frame_boxes.LabelName],
+              # [str(filtered_data_frame_boxes.LabelName).encode('utf-8')],
+              filtered_data_frame_boxes.LabelName.tolist(),
+              # [np.asarray(filtered_data_frame_boxes.LabelName)],
+          ),
       standard_fields.TfExampleFields.object_class_label:
           dataset_util.int64_list_feature(
               filtered_data_frame_boxes.LabelName.map(lambda x: label_map[x])
-              .as_matrix()),
+              # .as_matrix()),
+              ),
       standard_fields.TfExampleFields.filename:
-          dataset_util.bytes_feature('{}.jpg'.format(image_id)),
+          # dataset_util.bytes_feature('{}.jpg'.format(image_id)),
+          dataset_util.bytes_feature('{}.jpg'.format(image_id).encode('utf-8')),
       standard_fields.TfExampleFields.source_id:
-          dataset_util.bytes_feature(image_id),
+          # dataset_util.bytes_feature(image_id),
+          dataset_util.bytes_feature(image_id.encode('utf-8')),
       standard_fields.TfExampleFields.image_encoded:
           dataset_util.bytes_feature(encoded_image),
   }
@@ -78,22 +112,23 @@ def tf_example_from_annotations_data_frame(annotations_data_frame, label_map,
   if 'IsGroupOf' in filtered_data_frame.columns:
     feature_map[standard_fields.TfExampleFields.
                 object_group_of] = dataset_util.int64_list_feature(
-                    filtered_data_frame_boxes.IsGroupOf.as_matrix().astype(int))
+                    # filtered_data_frame_boxes.IsGroupOf.as_matrix().astype(int))
+                    filtered_data_frame_boxes.IsGroupOf.astype(int))
   if 'IsOccluded' in filtered_data_frame.columns:
     feature_map[standard_fields.TfExampleFields.
                 object_occluded] = dataset_util.int64_list_feature(
-                    filtered_data_frame_boxes.IsOccluded.as_matrix().astype(
-                        int))
+                    # filtered_data_frame_boxes.IsOccluded.as_matrix().astype(int))
+                    filtered_data_frame_boxes.IsOccluded.astype(int))
   if 'IsTruncated' in filtered_data_frame.columns:
     feature_map[standard_fields.TfExampleFields.
                 object_truncated] = dataset_util.int64_list_feature(
-                    filtered_data_frame_boxes.IsTruncated.as_matrix().astype(
-                        int))
+                    # filtered_data_frame_boxes.IsTruncated.as_matrix().astype(int))
+                filtered_data_frame_boxes.IsTruncated.astype(int))
   if 'IsDepiction' in filtered_data_frame.columns:
     feature_map[standard_fields.TfExampleFields.
                 object_depiction] = dataset_util.int64_list_feature(
-                    filtered_data_frame_boxes.IsDepiction.as_matrix().astype(
-                        int))
+                    # filtered_data_frame_boxes.IsDepiction.as_matrix().astype(int))
+                    filtered_data_frame_boxes.IsDepiction.astype(int))
 
   if 'ConfidenceImageLabel' in filtered_data_frame_labels.columns:
     feature_map[standard_fields.TfExampleFields.

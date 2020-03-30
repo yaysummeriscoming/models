@@ -34,14 +34,12 @@ class Resnet(object):
 
   def __init__(self,
                resnet_depth,
-               dropblock=nn_ops.Dropblock(),
                batch_norm_relu=nn_ops.BatchNormRelu,
                data_format='channels_last'):
     """ResNet initialization function.
 
     Args:
       resnet_depth: `int` depth of ResNet backbone model.
-      dropblock: a dropblock layer.
       batch_norm_relu: an operation that includes a batch normalization layer
         followed by a relu layer(optional).
       data_format: `str` either "channels_first" for `[batch, channels, height,
@@ -49,40 +47,18 @@ class Resnet(object):
     """
     self._resnet_depth = resnet_depth
 
-    self._dropblock = dropblock
     self._batch_norm_relu = batch_norm_relu
 
     self._data_format = data_format
 
     model_params = {
-        10: {
-            'block': self.residual_block,
-            'layers': [1, 1, 1, 1]
-        },
-        18: {
-            'block': self.residual_block,
-            'layers': [2, 2, 2, 2]
-        },
-        34: {
-            'block': self.residual_block,
-            'layers': [3, 4, 6, 3]
-        },
-        50: {
-            'block': self.bottleneck_block,
-            'layers': [3, 4, 6, 3]
-        },
-        101: {
-            'block': self.bottleneck_block,
-            'layers': [3, 4, 23, 3]
-        },
-        152: {
-            'block': self.bottleneck_block,
-            'layers': [3, 8, 36, 3]
-        },
-        200: {
-            'block': self.bottleneck_block,
-            'layers': [3, 24, 36, 3]
-        }
+        10: {'block': self.residual_block, 'layers': [1, 1, 1, 1]},
+        18: {'block': self.residual_block, 'layers': [2, 2, 2, 2]},
+        34: {'block': self.residual_block, 'layers': [3, 4, 6, 3]},
+        50: {'block': self.bottleneck_block, 'layers': [3, 4, 6, 3]},
+        101: {'block': self.bottleneck_block, 'layers': [3, 4, 23, 3]},
+        152: {'block': self.bottleneck_block, 'layers': [3, 8, 36, 3]},
+        200: {'block': self.bottleneck_block, 'layers': [3, 24, 36, 3]}
     }
 
     if resnet_depth not in model_params:
@@ -240,24 +216,20 @@ class Resnet(object):
           inputs=inputs, filters=filters_out, kernel_size=1, strides=strides)
       shortcut = self._batch_norm_relu(relu=False)(
           shortcut, is_training=is_training)
-    shortcut = self._dropblock(shortcut, is_training=is_training)
 
     inputs = self.conv2d_fixed_padding(
         inputs=inputs, filters=filters, kernel_size=1, strides=1)
     inputs = self._batch_norm_relu()(inputs, is_training=is_training)
-    inputs = self._dropblock(inputs, is_training=is_training)
 
     inputs = self.conv2d_fixed_padding(
         inputs=inputs, filters=filters, kernel_size=3, strides=strides)
     inputs = self._batch_norm_relu()(inputs, is_training=is_training)
-    inputs = self._dropblock(inputs, is_training=is_training)
 
     inputs = self.conv2d_fixed_padding(
         inputs=inputs, filters=4 * filters, kernel_size=1, strides=1)
     inputs = self._batch_norm_relu(
         relu=False, init_zero=True)(
             inputs, is_training=is_training)
-    inputs = self._dropblock(inputs, is_training=is_training)
 
     return tf.nn.relu(inputs + shortcut)
 

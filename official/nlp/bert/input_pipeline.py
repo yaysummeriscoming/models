@@ -36,27 +36,22 @@ def decode_record(record, name_to_features):
   return example
 
 
-def file_based_input_fn_builder(input_file, name_to_features):
-  """Creates an `input_fn` closure to be passed for BERT custom training."""
+def single_file_dataset(input_file, name_to_features):
+  """Creates a single-file dataset to be passed for BERT custom training."""
+  # For training, we want a lot of parallel reading and shuffling.
+  # For eval, we want no shuffling and parallel reading doesn't matter.
+  d = tf.data.TFRecordDataset(input_file)
+  d = d.map(lambda record: decode_record(record, name_to_features))
 
-  def input_fn():
-    """Returns dataset for training/evaluation."""
-    # For training, we want a lot of parallel reading and shuffling.
-    # For eval, we want no shuffling and parallel reading doesn't matter.
-    d = tf.data.TFRecordDataset(input_file)
-    d = d.map(lambda record: decode_record(record, name_to_features))
-
-    # When `input_file` is a path to a single file or a list
-    # containing a single path, disable auto sharding so that
-    # same input file is sent to all workers.
-    if isinstance(input_file, str) or len(input_file) == 1:
-      options = tf.data.Options()
-      options.experimental_distribute.auto_shard_policy = (
-          tf.data.experimental.AutoShardPolicy.OFF)
-      d = d.with_options(options)
-    return d
-
-  return input_fn
+  # When `input_file` is a path to a single file or a list
+  # containing a single path, disable auto sharding so that
+  # same input file is sent to all workers.
+  if isinstance(input_file, str) or len(input_file) == 1:
+    options = tf.data.Options()
+    options.experimental_distribute.auto_shard_policy = (
+        tf.data.experimental.AutoShardPolicy.OFF)
+    d = d.with_options(options)
+  return d
 
 
 def create_pretrain_dataset(input_patterns,
@@ -83,20 +78,24 @@ def create_pretrain_dataset(input_patterns,
           tf.io.FixedLenFeature([1], tf.int64),
   }
 
+  for input_pattern in input_patterns:
+    if not tf.io.gfile.glob(input_pattern):
+      raise ValueError('%s does not match any files.' % input_pattern)
+
   dataset = tf.data.Dataset.list_files(input_patterns, shuffle=is_training)
 
   if input_pipeline_context and input_pipeline_context.num_input_pipelines > 1:
     dataset = dataset.shard(input_pipeline_context.num_input_pipelines,
                             input_pipeline_context.input_pipeline_id)
+  if is_training:
+    dataset = dataset.repeat()
 
-  dataset = dataset.repeat()
-
-  # We set shuffle buffer to exactly match total number of
-  # training files to ensure that training data is well shuffled.
-  input_files = []
-  for input_pattern in input_patterns:
-    input_files.extend(tf.io.gfile.glob(input_pattern))
-  dataset = dataset.shuffle(len(input_files))
+    # We set shuffle buffer to exactly match total number of
+    # training files to ensure that training data is well shuffled.
+    input_files = []
+    for input_pattern in input_patterns:
+      input_files.extend(tf.io.gfile.glob(input_pattern))
+    dataset = dataset.shuffle(len(input_files))
 
   # In parallel, create tf record dataset for each train files.
   # cycle_length = 8 means that up to 8 files will be read and deserialized in
@@ -133,7 +132,7 @@ def create_pretrain_dataset(input_patterns,
   if is_training:
     dataset = dataset.shuffle(100)
 
-  dataset = dataset.batch(batch_size, drop_remainder=True)
+  dataset = dataset.batch(batch_size, drop_remainder=is_training)
   dataset = dataset.prefetch(1024)
   return dataset
 
@@ -142,7 +141,7 @@ def create_classifier_dataset(file_path,
                               seq_length,
                               batch_size,
                               is_training=True,
-                              drop_remainder=True):
+                              input_pipeline_context=None):
   """Creates input dataset from (tf)records files for train/eval."""
   name_to_features = {
       'input_ids': tf.io.FixedLenFeature([seq_length], tf.int64),
@@ -151,8 +150,13 @@ def create_classifier_dataset(file_path,
       'label_ids': tf.io.FixedLenFeature([], tf.int64),
       'is_real_example': tf.io.FixedLenFeature([], tf.int64),
   }
-  input_fn = file_based_input_fn_builder(file_path, name_to_features)
-  dataset = input_fn()
+  dataset = single_file_dataset(file_path, name_to_features)
+
+  # The dataset is always sharded by number of hosts.
+  # num_input_pipelines is the number of hosts rather than number of cores.
+  if input_pipeline_context and input_pipeline_context.num_input_pipelines > 1:
+    dataset = dataset.shard(input_pipeline_context.num_input_pipelines,
+                            input_pipeline_context.input_pipeline_id)
 
   def _select_data_from_record(record):
     x = {
@@ -169,12 +173,16 @@ def create_classifier_dataset(file_path,
     dataset = dataset.shuffle(100)
     dataset = dataset.repeat()
 
-  dataset = dataset.batch(batch_size, drop_remainder=drop_remainder)
+  dataset = dataset.batch(batch_size, drop_remainder=is_training)
   dataset = dataset.prefetch(1024)
   return dataset
 
 
-def create_squad_dataset(file_path, seq_length, batch_size, is_training=True):
+def create_squad_dataset(file_path,
+                         seq_length,
+                         batch_size,
+                         is_training=True,
+                         input_pipeline_context=None):
   """Creates input dataset from (tf)records files for train/eval."""
   name_to_features = {
       'input_ids': tf.io.FixedLenFeature([seq_length], tf.int64),
@@ -187,8 +195,13 @@ def create_squad_dataset(file_path, seq_length, batch_size, is_training=True):
   else:
     name_to_features['unique_ids'] = tf.io.FixedLenFeature([], tf.int64)
 
-  input_fn = file_based_input_fn_builder(file_path, name_to_features)
-  dataset = input_fn()
+  dataset = single_file_dataset(file_path, name_to_features)
+
+  # The dataset is always sharded by number of hosts.
+  # num_input_pipelines is the number of hosts rather than number of cores.
+  if input_pipeline_context and input_pipeline_context.num_input_pipelines > 1:
+    dataset = dataset.shard(input_pipeline_context.num_input_pipelines,
+                            input_pipeline_context.input_pipeline_id)
 
   def _select_data_from_record(record):
     """Dispatches record to features and labels."""

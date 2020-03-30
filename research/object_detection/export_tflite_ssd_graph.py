@@ -91,6 +91,9 @@ python object_detection/export_tflite_ssd_graph \
        "
 """
 
+import os
+os.environ['PYTHONPATH'] += ':/content/models/research/:/content/models/research/slim/'
+
 import tensorflow as tf
 from google.protobuf import text_format
 from object_detection import export_tflite_ssd_graph_lib

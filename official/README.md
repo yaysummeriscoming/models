@@ -1,6 +1,6 @@
 # TensorFlow Official Models
 
-The TensorFlow official models are a collection of example models that use
+The TensorFlow official models are a collection of models that use
 TensorFlow's high-level APIs. They are intended to be well-maintained, tested,
 and kept up to date with the latest TensorFlow API. They should also be
 reasonably optimized for fast performance while still being easy to read.
@@ -18,16 +18,16 @@ from the
 You may start from installing with pip:
 
 ```shell
-pip install tf-nightly
+pip3 install tf-nightly
 ```
 
 **Stable versions** of the official models targeting releases of TensorFlow are
 available as tagged branches or
 [downloadable releases](https://github.com/tensorflow/models/releases). Model
 repository version numbers match the target TensorFlow release, such that
-[release v2.0](https://github.com/tensorflow/models/releases/tag/v2.0) are
+[release v2.1.0](https://github.com/tensorflow/models/releases/tag/v2.1.0) are
 compatible with
-[TensorFlow v2.0.0](https://github.com/tensorflow/tensorflow/releases/tag/v2.0.0).
+[TensorFlow v2.1.0](https://github.com/tensorflow/tensorflow/releases/tag/v2.1.0).
 
 If you are on a version of TensorFlow earlier than 1.4, please
 [update your installation](https://www.tensorflow.org/install/).
@@ -39,7 +39,15 @@ Please follow the below steps before running models in this repo:
 1.  TensorFlow
     [nightly binaries](https://github.com/tensorflow/tensorflow#installation)
 
-2.  Add the top-level ***/models*** folder to the Python path with the command:
+2.  If users would like to clone this repo but do not care about change history,
+please consider:
+
+  ```shell
+  export repo_version="master"
+  git clone -b ${repo_version} https://github.com/tensorflow/models.git --depth=1
+  ```
+
+3.  Add the top-level ***/models*** folder to the Python path with the command:
 
   ```shell
   export PYTHONPATH=$PYTHONPATH:/path/to/models
@@ -48,20 +56,16 @@ Please follow the below steps before running models in this repo:
   Using Colab:
 
   ```python
-  import os os.environ['PYTHONPATH'] += ":/path/to/models"
+  import os
+  os.environ['PYTHONPATH'] += ":/path/to/models"
   ```
 
-3.  Install dependencies:
+4.  Install dependencies:
 
   ```shell
   pip3 install --user -r official/requirements.txt
   ```
 
-  or (Python 2 compatibility is not guaranteed)
-
-  ```shell
-  pip install --user -r official/requirements.txt
-  ```
 
 To make Official Models easier to use, we are planning to create a pip
 installable Official Models package. This is being tracked in
@@ -69,15 +73,19 @@ installable Official Models package. This is being tracked in
 
 ## Available models
 
+**NOTE: For Officially Supported TPU models please check [README-TPU](README-TPU.md).**
+
 **NOTE:** Please make sure to follow the steps in the
 [Requirements](#requirements) section.
 
 ### Natural Language Processing
 
+*   [albert](nlp/albert): A Lite BERT for Self-supervised Learning of Language
+    Representations.
 *   [bert](nlp/bert): A powerful pre-trained language representation model:
     BERT, which stands for Bidirectional Encoder Representations from
     Transformers.
-*   [transformer](transformer): A transformer model to translate the WMT English
+*   [transformer](nlp/transformer): A transformer model to translate the WMT English
     to German dataset.
 *   [xlnet](nlp/xlnet): XLNet: Generalized Autoregressive Pretraining for
     Language Understanding.
@@ -88,7 +96,7 @@ installable Official Models package. This is being tracked in
     the MNIST dataset.
 *   [resnet](vision/image_classification): A deep residual network that can be
     used to classify both CIFAR-10 and ImageNet's dataset of 1000 classes.
-*   [retinanet](vision/detection): A fast and power detector.
+*   [retinanet](vision/detection): A fast and powerful object detector.
 
 ### Others
 

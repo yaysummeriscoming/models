@@ -20,11 +20,13 @@ from __future__ import print_function
 
 import re
 
+from absl import logging
 import tensorflow as tf
+import tensorflow_addons.optimizers as tfa_optimizers
 
 
 class WarmUp(tf.keras.optimizers.schedules.LearningRateSchedule):
-  """Applys a warmup schedule on a given learning rate decay schedule."""
+  """Applies a warmup schedule on a given learning rate decay schedule."""
 
   def __init__(
       self,
@@ -65,7 +67,8 @@ class WarmUp(tf.keras.optimizers.schedules.LearningRateSchedule):
     }
 
 
-def create_optimizer(init_lr, num_train_steps, num_warmup_steps):
+def create_optimizer(init_lr, num_train_steps, num_warmup_steps,
+                     optimizer_type='adamw'):
   """Creates an optimizer with learning rate schedule."""
   # Implements linear decay of the learning rate.
   learning_rate_fn = tf.keras.optimizers.schedules.PolynomialDecay(
@@ -76,13 +79,28 @@ def create_optimizer(init_lr, num_train_steps, num_warmup_steps):
     learning_rate_fn = WarmUp(initial_learning_rate=init_lr,
                               decay_schedule_fn=learning_rate_fn,
                               warmup_steps=num_warmup_steps)
-  optimizer = AdamWeightDecay(
-      learning_rate=learning_rate_fn,
-      weight_decay_rate=0.01,
-      beta_1=0.9,
-      beta_2=0.999,
-      epsilon=1e-6,
-      exclude_from_weight_decay=['layer_norm', 'bias'])
+
+  if optimizer_type == 'adamw':
+    logging.info('using Adamw optimizer')
+    optimizer = AdamWeightDecay(
+        learning_rate=learning_rate_fn,
+        weight_decay_rate=0.01,
+        beta_1=0.9,
+        beta_2=0.999,
+        epsilon=1e-6,
+        exclude_from_weight_decay=['layer_norm', 'bias'])
+  elif optimizer_type == 'lamb':
+    logging.info('using Lamb optimizer')
+    optimizer = tfa_optimizers.LAMB(
+        learning_rate=learning_rate_fn,
+        weight_decay_rate=0.01,
+        beta_1=0.9,
+        beta_2=0.999,
+        epsilon=1e-6,
+        exclude_from_weight_decay=['layer_norm', 'bias'])
+  else:
+    raise ValueError('Unsupported optimizer type: ', optimizer_type)
+
   return optimizer
 
 
@@ -125,7 +143,7 @@ class AdamWeightDecay(tf.keras.optimizers.Adam):
   def _prepare_local(self, var_device, var_dtype, apply_state):
     super(AdamWeightDecay, self)._prepare_local(var_device, var_dtype,
                                                 apply_state)
-    apply_state['weight_decay_rate'] = tf.constant(
+    apply_state[(var_device, var_dtype)]['weight_decay_rate'] = tf.constant(
         self.weight_decay_rate, name='adam_weight_decay_rate')
 
   def _decay_weights_op(self, var, learning_rate, apply_state):
@@ -133,14 +151,26 @@ class AdamWeightDecay(tf.keras.optimizers.Adam):
     if do_decay:
       return var.assign_sub(
           learning_rate * var *
-          apply_state['weight_decay_rate'],
+          apply_state[(var.device, var.dtype.base_dtype)]['weight_decay_rate'],
           use_locking=self._use_locking)
     return tf.no_op()
 
-  def apply_gradients(self, grads_and_vars, name=None):
+  def apply_gradients(self,
+                      grads_and_vars,
+                      name=None,
+                      experimental_aggregate_gradients=True):
     grads, tvars = list(zip(*grads_and_vars))
-    (grads, _) = tf.clip_by_global_norm(grads, clip_norm=1.0)
-    return super(AdamWeightDecay, self).apply_gradients(zip(grads, tvars))
+    if experimental_aggregate_gradients:
+      # when experimental_aggregate_gradients = False, apply_gradients() no
+      # longer implicitly allreduce gradients, users manually allreduce gradient
+      # and passed the allreduced grads_and_vars. For now, the
+      # clip_by_global_norm will be moved to before the explicit allreduce to
+      # keep the math the same as TF 1 and pre TF 2.2 implementation.
+      (grads, _) = tf.clip_by_global_norm(grads, clip_norm=1.0)
+    return super(AdamWeightDecay, self).apply_gradients(
+        zip(grads, tvars),
+        name=name,
+        experimental_aggregate_gradients=experimental_aggregate_gradients)
 
   def _get_lr(self, var_device, var_dtype, apply_state):
     """Retrieves the learning rate with the given state."""
